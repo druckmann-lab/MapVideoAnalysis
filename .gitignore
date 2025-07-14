@@ -1,0 +1,26 @@
+# Data files
+*.pkl
+*.pickle
+*.csv
+*.mat
+*.json
+
+# Python cache files
+__pycache__
+.ipynb_checkpoints/
+
+# Image and document files
+*.png
+*.jpg
+*.jpeg
+*.pdf
+
+# Project specific directories
+figs/
+data/
+
+# Virtual environments
+# python 3.8 that was used for all analysis
+python38_venv/
+# pyhton 3.12 that I am using currently for development of deep learning models
+local_venv/

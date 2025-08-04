@@ -372,18 +372,27 @@ class Figure2():
 
         return area_means[stat_method], area_sems[stat_method], U_stats, p_values
 
-    def plot_barplot_with_sem(self, ax, fr_threshold = 2, r2_threshold = 0.005, fr_filter = 'avg' ,epoch = 'response', ylim = [0.,0.29], alpha = 0.8):
+    def plot_barplot_with_sem(self, ax, 
+                              fr_threshold = 2, r2_threshold = 0.005, 
+                              fr_filter = 'avg' ,epoch = 'response', 
+                              ylim = [0.,0.29], alpha = 0.8,
+                              add_dots = True,
+                              legend_anchor = None,
+                              label_names = None):
         if fr_filter == 'avg':
             fr = self.combined_r2_data['avg_fr']
         elif fr_filter == 'epoch':
             fr = self.combined_r2_data['%s_fr'%epoch]
+
+        #add_dots = True
 
         embed = self.combined_r2_data['r2_embed_%s'%epoch]
         marker = self.combined_r2_data['r2_marker_%s'%epoch]
         e2e = self.combined_r2_data['r2_e2e_%s'%epoch]
 
         methods = ['embedding', 'marker', 'e2e']
-        label_names = ['Embedding based pred.', 'Marker based pred.', 'End-to-end pred.']
+        if label_names is None:
+            label_names = ['Embedding based', 'Marker based', 'End-to-end']
         color_list = ['b', 'g', 'brown']
         method_data = {'embedding': embed, 'marker': marker, 'e2e': e2e}
         area_means = {method: [] for method in methods}
@@ -397,8 +406,13 @@ class Figure2():
         for area in self.areas:
             inds = func.get_single_area_inds(area, self.allen_hierarchy, ccf_labels, alm_inds)
             inds = np.intersect1d(inds, filter_inds)
+            area_sessions = self.combined_r2_data['file_name'][inds]
+            unique_sessions = np.unique(area_sessions)
             for method in methods:
-                m, sem = self._calc_mean_and_sem(method_data[method][inds])
+                area_method_values = method_data[method][inds]
+                session_means = np.array([area_method_values[area_sessions == session].mean() for session in unique_sessions])
+                #m, sem = self._calc_mean_and_sem(method_data[method][inds])
+                m, sem = self._calc_mean_and_sem(session_means)
                 area_means[method].append(m)
                 area_sems[method].append(sem)
         
@@ -412,12 +426,29 @@ class Figure2():
         ax.bar(np.arange(0,len(self.areas)) - 0.2, area_means[methods[2]], color = color_list[2], 
                 yerr=area_sems[methods[2]], align='center', ecolor='black', capsize=3, width = 0.2,
                 label = label_names[2], alpha = alpha)
+        
+        if add_dots:
+            for i_area, area in enumerate(self.areas):
+                inds = func.get_single_area_inds(area, self.allen_hierarchy, ccf_labels, alm_inds)
+                inds = np.intersect1d(inds, filter_inds)
+                area_sessions = self.combined_r2_data['file_name'][inds]
+                unique_sessions = np.unique(area_sessions)
+                for ii, method in enumerate(methods):
+                    area_method_values = method_data[method][inds]
+                    session_means = np.array([area_method_values[area_sessions == session].mean() for session in unique_sessions])
+                    ax.plot(np.ones(len(session_means)) + i_area - 1 + ii * 0.2 - 0.6*(ii==2), 
+                            session_means, 'o', color = 'k', markerfacecolor='none',
+                              alpha = 0.5, markersize = 1, linewidth = 0.4)
+           
 
         ax.set_xticks(np.arange(0,len(self.areas)))
         ax.set_xticklabels(self.areas, rotation = 45)
         ax.set_ylim(ylim)
-        ax.set_ylabel(r'mean $R^2$')
-        ax.legend(fontsize = 6)
+        ax.set_ylabel('Mean explained variance')
+        if legend_anchor is not None:
+            ax.legend(fontsize = 5.5, bbox_to_anchor=legend_anchor, loc='upper left', frameon=False)
+        else:
+            ax.legend(fontsize = 6, )
 
     def plot_methods_scatter(self, ax, x_method = 'marker', y_method = 'embed',  fr_filter = 'avg', epoch = 'response', fr_threshold = 2, r2_threshold = 0.005):
         x = self.combined_r2_data['r2_%s_%s'%(x_method, epoch)]
@@ -679,7 +710,10 @@ class Figure2():
         else:
             return 'n.s.'
 
-    def _statistics_decorator_from_p_values(self,ax, p_values, x_init = 0.2375, decrease = 0.0025, gap = 0.01, big_gap = 0.0125):
+    def _statistics_decorator_from_p_values(self,ax, p_values, 
+                                            x_init = 0.2375, decrease = 0.0025, 
+                                            gap = 0.01, big_gap = 0.0125,
+                                            fonts = 6):
         p_strings = [self._p_value_to_str(p) for p in p_values]
         x0 = x_init
         current_str = ''
@@ -687,11 +721,11 @@ class Figure2():
         for i in range(4): 
             if i == 0: 
                 current_str = p_strings[ii]
-                ax.text(x = 0, y = x0 + 0.002, s= current_str, fontsize = 6)  
+                ax.text(x = 0, y = x0 + 0.002, s= current_str, fontsize = fonts)  
             if current_str != p_strings[ii]:
                 x0 -= gap
                 current_str = p_strings[ii]
-                ax.text(x = 0, y = x0 + 0.002, s= current_str, fontsize = 6)
+                ax.text(x = 0, y = x0 + 0.002, s= current_str, fontsize = fonts)
             ax.hlines(x0, 0, 1+i, color = 'b', lw = 0.5,)
             x0 -= decrease
             ii += 1
@@ -700,11 +734,11 @@ class Figure2():
         for i in range(3):
             if i == 0: 
                 current_str = p_strings[ii]
-                ax.text(x = 1, y = x0 + 0.002, s= current_str, fontsize = 6)  
+                ax.text(x = 1, y = x0 + 0.002, s= current_str, fontsize = fonts)  
             if current_str != p_strings[ii]:
                 x0 -= gap
                 current_str = p_strings[ii]
-                ax.text(x = 1, y = x0 + 0.002, s= current_str, fontsize = 6)
+                ax.text(x = 1, y = x0 + 0.002, s= current_str, fontsize = fonts)
             ax.hlines(x0, 1, 2+i, color = 'b', lw = 0.5,)
             x0 -= decrease
             ii += 1
@@ -713,11 +747,11 @@ class Figure2():
         for i in range(2):
             if i == 0: 
                 current_str = p_strings[ii]
-                ax.text(x = 2, y = x0 + 0.002, s= current_str, fontsize = 6)  
+                ax.text(x = 2, y = x0 + 0.002, s= current_str, fontsize = fonts)  
             if current_str != p_strings[ii]:
                 x0 -= gap
                 current_str = p_strings[ii]
-                ax.text(x = 2, y = x0 + 0.002, s= current_str, fontsize = 6)
+                ax.text(x = 2, y = x0 + 0.002, s= current_str, fontsize = fonts)
             ax.hlines(x0, 2, 3+i, color = 'b', lw = 0.5,)
             x0 -= decrease
             ii += 1
@@ -725,7 +759,7 @@ class Figure2():
         x0 -= big_gap
         for i in range(1):
             current_str = p_strings[ii]
-            ax.text(x = 3, y = x0 + 0.002, s= current_str, fontsize = 6)
+            ax.text(x = 3, y = x0 + 0.002, s= current_str, fontsize = fonts)
             ax.hlines(x0, 3, 4+i, color = 'b', lw = 0.5,)
             x0 -= decrease
         return ax
@@ -796,6 +830,76 @@ class Figure2():
         fig.text(0.05,  0.32, 'f', ha='center', va='center', fontsize=16)
 
         return fig, [ax1, ax2, ax3, ax4, ax5, ax6, ax7, ax8, ax9]
+
+    def plot_fig2_main_final(self,):
+        import matplotlib.gridspec as gridspec
+        fig = plt.figure(figsize = (7.08, 7.08 * 14 / 12))
+        gs = gridspec.GridSpec(14, 12, figure=fig, wspace=0.5, hspace=0.5, left = 0.2, right = 0.8, bottom = .2)  # 14 rows and 12 columns
+
+        # Top row, two subplots 6x6
+        ax1 = fig.add_subplot(gs[0:6, 0:6])  # First subplot, 3 rows x 3 columns
+        ax2 = fig.add_subplot(gs[0:6, 6:12])  # Second subplot, 3 rows x 3 columns
+
+        # Second row, three subplots 3x3
+        ax3 = fig.add_subplot(gs[6:10, 0:4])  # Third subplot, 3 rows x 2 columns
+        ax4 = fig.add_subplot(gs[6:10, 4:8])  # Fourth subplot, 3 rows x 2 columns
+        ax5 = fig.add_subplot(gs[6:10, 8:12])  # Fifth subplot, 3 rows x 2 columns
+
+        # Third and fourth row, two subplots 6x2
+        ax6 = fig.add_subplot(gs[10:12, 0:6])  # Sixth subplot, 2 rows x 3 columns
+        ax7 = fig.add_subplot(gs[10:12, 6:12])  # Seventh subplot, 2 rows x 3 columns
+        ax8 = fig.add_subplot(gs[12:14, 0:6])  # Sixth subplot, 2 rows x 3 columns
+        ax9 = fig.add_subplot(gs[12:14, 6:12])  # Seventh subplot, 2 rows x 3 columns
+
+
+        ax2.set_position([0.55, 0.65, 0.4, 0.3])  # [left, bottom, width, height]
+        ax3.set_position([0.12, 0.35, 0.22, 0.18])
+        ax4.set_position([0.42, 0.35, 0.22, 0.18])
+        ax5.set_position([0.72, 0.35, 0.22, 0.18])
+        ax6.set_position([0.12, 0.22, 0.35, 0.07])
+        ax7.set_position([0.55, 0.22, 0.35, 0.07])
+        ax8.set_position([0.12, 0.1, 0.35, 0.07])
+        ax9.set_position([0.55, 0.1, 0.35, 0.07])
+
+        self.plot_saggital_heatmap(fig = fig, ax = ax1, 
+                                fr_threshold=2,r2_threshold=0.01, 
+                                cbar_fraction= 0.1, 
+                                cbar_x0_shift=-0.07, cbar_y0_shift = 0.03, 
+                                vlims=[0,0.15], 
+                                voxel_size=150, filter_size=3, 
+                                cbar_label= 'Explained variance', use_all_sessions=True, 
+                                colormap='Blues')
+        ax1.set_position([0.08, 0.68, 0.4, 0.35])
+        ax1.set_xlabel('Anterior-Posterior')
+        ax1.set_ylabel('Dorsal-Ventral')
+
+        self.plot_barplot_with_sem(ax2, fr_threshold = 2, r2_threshold = 0.01, 
+                                   fr_filter='epoch', epoch = 'response',
+                                   ylim = [0,0.338], legend_anchor=[0.65,0.75])
+        _,_,_,ps = self.get_barplot_statistics(epoch = 'response')
+        self._statistics_decorator_from_p_values(ax2,ps, x_init = 0.336, fonts = 5)
+        ax2.set_ylabel('Mean explained variance')
+        self.plot_methods_scatter(ax3, x_method = 'marker', y_method = 'embed', fr_filter = 'epoch', epoch = 'response', fr_threshold = 2, r2_threshold = 0.01)
+        self.plot_methods_scatter(ax4, x_method = 'marker', y_method = 'e2e', fr_filter = 'epoch', epoch = 'response', fr_threshold = 2, r2_threshold = 0.01)
+        self.plot_methods_scatter(ax5, x_method = 'embed', y_method = 'e2e', fr_filter = 'epoch', epoch = 'response', fr_threshold = 2, r2_threshold = 0.01)
+
+        self.plot_single_neuron_example(ax6, id = 4, print_epochs = True, add_legend=True, legend_anchor=(-0.005, 1.4))
+        ax6.legend(bbox_to_anchor=(.001, 1.4), loc='upper left', fontsize = 5,)
+
+        self.plot_single_neuron_example(ax7, id = 2, print_epochs= True)
+        self.plot_single_neuron_example(ax8, id = 3)
+        self.plot_single_neuron_example(ax9, id = 1)
+
+
+        fig.text(0.05,  0.95, 'a', ha='center', va='center', fontsize=16)
+        fig.text(0.50, 0.95, 'b', ha='center', va='center', fontsize=16)
+        fig.text(0.05,  0.56, 'c', ha='center', va='center', fontsize=16)
+        fig.text(0.38,  0.56, 'd', ha='center', va='center', fontsize=16)
+        fig.text(0.68,  0.56, 'e', ha='center', va='center', fontsize=16)
+        fig.text(0.05,  0.32, 'f', ha='center', va='center', fontsize=16)
+
+        return fig, [ax1, ax2, ax3, ax4, ax5, ax6, ax7, ax8, ax9]
+
 
 #plt.savefig(figfolder + 'figure2_draft_v3.png', dpi=300, bbox_inches = 'tight')
 
@@ -2019,6 +2123,8 @@ class Figure4():
         U_values_fr = np.zeros((len(label_names), len(label_names)))
         p_values_fr = np.ones((len(label_names), len(label_names)))
 
+        for area, r2_array in r2_subregions.items():
+            print(area, len(r2_array))
         for i,area_i in enumerate(r2_subregions.keys()):
             for j,area_j in enumerate(r2_subregions.keys()):
                 if i == j:
@@ -2035,7 +2141,7 @@ class Figure4():
 
 
 
-    def plot_barplot_with_sem(self, ax, epoch = 'response', r2_method_string = '', ylabel = r'mean $R^2$'):
+    def plot_barplot_with_sem(self, ax, epoch = 'response', r2_method_string = '', ylabel = 'Mean explained variance', add_dots = True):
         r2 = self.r2_data['5_0']['%s_r2%s'%(epoch, r2_method_string)].copy()
         ccf_labels, ccf_coords, alm_inds = self._get_misc_arrays()
         inds, label_names = self.get_thalamus_nuclei_inds()
@@ -2048,12 +2154,59 @@ class Figure4():
             m, yerr = sem, alpha = 1., color = color_list, 
             capsize = 3, width=0.8)
         
+        if add_dots:
+            for ii, area in enumerate(inds.keys()):
+                ax.plot(np.ones(inds[area].shape[0]) * ii, r2[inds[area]], 'o', 
+                        color = 'black', alpha = 0.5, markersize = 1)
+        
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
 
         _ = ax.set_xticks(np.arange(0,len(m)))
         _ = ax.set_xticklabels(label_names, rotation = 0)
         _ = ax.set_ylabel(ylabel)
+
+        return ax
+    
+    def plot_boxplot(self, ax, epoch = 'response', r2_method_string = '', ylabel = 'Mean explained variance', add_dots = True):
+        r2 = self.r2_data['5_0']['%s_r2%s'%(epoch, r2_method_string)].copy()
+        ccf_labels, ccf_coords, alm_inds = self._get_misc_arrays()
+        inds, label_names = self.get_thalamus_nuclei_inds()
+
+        color_list = self._get_color_list(len(label_names))
+        
+        # Prepare data for boxplot
+        data_for_boxplot = []
+        for area in inds.keys():
+            data_for_boxplot.append(r2[inds[area]])
+        
+        # Create boxplot
+        bp = ax.boxplot(data_for_boxplot, patch_artist=True, 
+                        widths=0.6, showfliers=False)
+        
+        # Color the boxes
+        for patch, color in zip(bp['boxes'], color_list):
+            patch.set_facecolor(color)
+            patch.set_alpha(1.)
+        
+        # Style the boxplot elements
+        for element in ['whiskers', 'fliers', 'medians', 'caps']:
+            plt.setp(bp[element], color='black', linewidth=1)
+        
+        if add_dots:
+            for ii, area in enumerate(inds.keys()):
+                # Add jitter to x-coordinates for better visibility
+                np.random.seed(42)  # For reproducibility
+                x_jitter = np.random.normal(ii + 1, 0.02, size=len(inds[area]))
+                ax.plot(x_jitter, r2[inds[area]], 'o', 
+                        color='black', alpha=0.3, markersize=1)
+        
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+        ax.set_xticks(np.arange(1, len(label_names) + 1))
+        ax.set_xticklabels(label_names, rotation=0)
+        ax.set_ylabel(ylabel)
 
         return ax
     
@@ -2103,7 +2256,7 @@ class Figure4():
         if auc_diff is not None and p_value is not None:
             ax.plot([],[],' ',label='auc_diff=%0.3f'%auc_diff)
             ax.plot([],[],' ',label='p=%0.3f'%p_value)
-        ax.legend(frameon = False, loc = 'lower right', fontsize = 8)
+        ax.legend(frameon = False, loc = 'lower right', fontsize = 6)
 
 
         return ax
@@ -2474,6 +2627,94 @@ class Figure6():
                 (medulla_trial + alm_trial)/(medulla_motor + medulla_trial + alm_motor + alm_trial), 
                 alternative = 'two-sided')
             print('Medulla p-value: ',p_value)'''
+
+    def plot_modulated_fraction_area_barplot_per_session(self, ax, cutoff=0.65, add_dots=True, use_animal_color = False):
+        """
+        Plot modulated fraction area barplot with means calculated per session.
+        
+        Args:
+            ax: matplotlib axis
+            cutoff: AUC cutoff threshold
+            add_dots: whether to add individual session dots
+        """
+        ccfs, coords, alm_inds = self._get_misc_arrays()
+        area_inds = {area: func.get_single_area_inds(area, self.allen_hierarchy, ccfs, alm_inds) for area in self.areas}
+        
+        masks = self._get_auc_type_masks(cutoff=cutoff)  # motor, trial, both, none
+        
+        unique_sessions = np.unique(self.auc_delay_data['session_names'])
+        unique_animals = np.unique([session[:5] for session in unique_sessions])
+        sessions = np.array([session for session in self.auc_delay_data['session_names']])
+        
+        # Calculate per-session fractions for each area and modulation type
+        session_fractions = {area: {'motor': [], 'trial': [], 'both': []} for area in self.areas}
+        
+        for session in unique_sessions:
+            for j, area in enumerate(self.areas):
+                _area_session_inds = np.intersect1d(area_inds[area], np.where(sessions == session)[0])
+                
+                for ii, modulation_type in enumerate(['motor', 'trial', 'both']):
+                    _this_inds = np.intersect1d(_area_session_inds, np.where(masks[ii] == True)[0])
+                    if len(_area_session_inds) == 0:
+                        session_fractions[area][modulation_type].append(np.nan)
+                    else:
+                        session_fractions[area][modulation_type].append(len(_this_inds) / len(_area_session_inds))
+        
+        # Calculate means and SEMs across sessions for each area
+        area_means = {'motor': [], 'trial': [], 'both': []}
+        area_sems = {'motor': [], 'trial': [], 'both': []}
+        
+        for area in self.areas:
+            for modulation_type in ['motor', 'trial', 'both']:
+                fractions = np.array(session_fractions[area][modulation_type])
+                # Remove NaN values
+                valid_fractions = fractions[~np.isnan(fractions)]
+                if len(valid_fractions) > 0:
+                    mean_frac = np.mean(valid_fractions)
+                    sem_frac = np.std(valid_fractions) / np.sqrt(len(valid_fractions))
+                else:
+                    mean_frac = 0
+                    sem_frac = 0
+                area_means[modulation_type].append(mean_frac)
+                area_sems[modulation_type].append(sem_frac)
+        
+        # Plot bars
+        colors = ['orange', 'purple', 'black']
+        labels = ['uninstructed movement modulated', 'choice modulated', 'both']
+        x_offsets = [-0.2, 0, 0.2]
+        
+        for i, (modulation_type, color, label, offset) in enumerate(zip(['motor', 'trial', 'both'], colors, labels, x_offsets)):
+            ax.bar(np.arange(len(self.areas)) + offset, 
+                area_means[modulation_type], 
+                yerr=area_sems[modulation_type], 
+                capsize=2, width=0.2, color=color, label=label)
+        
+        # Add individual session dots if requested
+        if add_dots:
+            np.random.seed(0)
+            for i, session in enumerate(unique_sessions):
+                i_animal = np.where(unique_animals == session[:5])[0][0]
+                if use_animal_color: animal_color = plt.cm.gnuplot(i_animal / len(unique_animals))
+                else: animal_color = 'black'
+                
+                for j, area in enumerate(self.areas):
+                    for ii, offset in enumerate(x_offsets):
+                        modulation_type = ['motor', 'trial', 'both'][ii]
+                        fraction = session_fractions[area][modulation_type][i]
+                        if not np.isnan(fraction):
+                            # Add small random jitter to x position
+                            np.random.seed(42 + i)  # Ensure reproducibility
+                            x_pos = j + offset + np.random.uniform(-0.03, 0.03)
+                            ax.plot(x_pos, fraction, '.', color=animal_color, alpha=0.5, markersize=2)
+        
+        # Format plot
+        ax.set_xticks(np.arange(len(self.areas)))
+        ax.set_xticklabels(self.areas, rotation=90)
+        ax.set_ylabel('Fraction of neurons')
+        ax.legend(loc='upper left')
+        ax.set_ylim(0, 0.44)
+        
+        return ax
         
     def get_medulla_alm_fraction_stats(self, cutoff = 0.65,):
         ccfs, coords, alm_inds = self._get_misc_arrays()

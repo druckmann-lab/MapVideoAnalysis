@@ -13,6 +13,8 @@ Standalone, lightweight implementation of the deep learning methods can be found
 The data used for this study has been publised and is available at:
 Chen, S., et al. Mesoscale Activity Map Dataset. DANDI archive, 2023.  DOI: https://doi.org/10.48324/dandi.000363/0.230822.0128. 
 
+Processed data and miscellaneous files necessary to create all the figures can be found [here](https://office365stanford-my.sharepoint.com/:u:/g/personal/kurgyis_stanford_edu/EZvgXAchm2JEvP-rypygu7YBriMkCsWSDcrNO58Bf3hoFw?e=PFSFZE).
+
 ## Installaion
 
 The code found here can be run without installaion, just make sure that you import `local_env` in your notebooks or scripts that will add the VideoAnalysisUtils package to your path, such as:
